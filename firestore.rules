@@ -1,0 +1,41 @@
+rules_version = '2';
+
+/* =============================================================================
+ *  Reglas de seguridad de Firestore
+ * -----------------------------------------------------------------------------
+ *  Esta actividad no usa cuentas de usuario (las estudiantes entran con un
+ *  nombre, sin registrarse), así que las reglas son abiertas PERO acotadas a la
+ *  colección "salas" y con algunas validaciones para evitar datos basura.
+ *
+ *  Es un nivel de seguridad razonable para una actividad de clase, breve y con
+ *  un código de sala que no es público. Si vas a dejar la app abierta a
+ *  internet mucho tiempo, conviene activar Firebase App Check (ver README).
+ * ========================================================================== */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /salas/{codigo} {
+      // Cualquiera con el código puede leer la sala y crearla/controlarla.
+      allow read, create, update: if true;
+      allow delete: if false;
+
+      // Participantes: se pueden crear y leer, pero no borrar.
+      match /participantes/{idParticipante} {
+        allow read, create: if true;
+        allow update, delete: if false;
+      }
+
+      // Respuestas: se crean y pueden editarse (si la docente lo habilita).
+      // Validamos que la opción sea una de las tres y la justificación no sea
+      // gigante, para evitar abusos.
+      match /respuestas/{idRespuesta} {
+        allow read: if true;
+        allow create, update: if
+          request.resource.data.opcion in ['acuerdo', 'depende', 'desacuerdo'] &&
+          request.resource.data.justificacion is string &&
+          request.resource.data.justificacion.size() <= 400;
+        allow delete: if false;
+      }
+    }
+  }
+}
