@@ -1,0 +1,471 @@
+/* =============================================================================
+ *  estilos.css  —  Sistema de diseño de la aplicación
+ * -----------------------------------------------------------------------------
+ *  Estética: calma deliberada. Mucho aire, tipografía limpia (Inter) para la
+ *  interfaz y una serif suave (Fraunces) para las afirmaciones —para que
+ *  "inviten a pensar"—. Un único acento índigo, sobrio. El tricolor
+ *  (verde/ámbar/rojo) vive solo dentro de las tres opciones.
+ *
+ *  Todo el color pasa por variables CSS, así el modo oscuro es un solo bloque.
+ * ========================================================================== */
+
+/* ------------------------------- Tokens (tema claro) ---------------------- */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --ink: #14161c;
+  --muted: #5b616e;
+  --line: #e6e8ee;
+
+  --accent: #4338ca;
+  --accent-ink: #ffffff;
+  --accent-soft: #eef0fe;
+
+  /* Opciones (tonos apagados, no “semáforo”) */
+  --verde: #1f9d57;  --verde-bg: #eaf7ef;  --verde-line: #b6e3c7;
+  --ambar: #b57e05;  --ambar-bg: #fbf3e2;  --ambar-line: #ebd6a3;
+  --rojo:  #cf4c43;  --rojo-bg:  #fbeceb;  --rojo-line:  #f0c4bf;
+
+  --sombra: 0 1px 2px rgba(17,19,24,.04), 0 8px 24px rgba(17,19,24,.06);
+  --sombra-fuerte: 0 12px 40px rgba(17,19,24,.14);
+
+  --r: 16px;      /* radio de tarjetas */
+  --r-sm: 10px;   /* radio de botones/chips */
+  --paso: .22s cubic-bezier(.2,.7,.2,1);  /* transición base */
+
+  --ancho: 720px; /* ancho máximo de contenido centrado */
+}
+
+/* ------------------------------- Tokens (tema oscuro) --------------------- */
+:root[data-tema="oscuro"] {
+  --bg: #0d0e12;
+  --surface: #16181f;
+  --surface-2: #1e212a;
+  --ink: #eceef3;
+  --muted: #9aa1af;
+  --line: #262a33;
+
+  --accent: #8b84f5;
+  --accent-ink: #0d0e12;
+  --accent-soft: #1c1d34;
+
+  --verde: #4ec78a;  --verde-bg: #13241b;  --verde-line: #24503a;
+  --ambar: #e0b24e;  --ambar-bg: #271f12;  --ambar-line: #5a4a22;
+  --rojo:  #ec6f66;  --rojo-bg:  #291816;  --rojo-line:  #5a302c;
+
+  --sombra: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  --sombra-fuerte: 0 16px 48px rgba(0,0,0,.5);
+}
+
+/* --------------------------------- Base ---------------------------------- */
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--paso), color var(--paso);
+}
+
+h1, h2, h3 { line-height: 1.2; letter-spacing: -.01em; margin: 0; }
+p { margin: 0; }
+a { color: var(--accent); }
+
+/* Foco visible y consistente para accesibilidad (teclado). */
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.oculto { display: none !important; }
+.visualmente-oculto {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ------------------------------- Estructura ------------------------------ */
+.escena {
+  max-width: var(--ancho);
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 40px);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Barra superior con marca y controles (tema, pantalla completa). */
+.barra-superior {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: clamp(24px, 5vw, 48px);
+}
+.marca { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.marca .punto {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.marca .nombre { font-size: .95rem; letter-spacing: -.01em; }
+.marca .sub { color: var(--muted); font-weight: 400; font-size: .8rem; }
+
+.controles-barra { display: flex; gap: 6px; }
+
+/* Contenido que ocupa el centro vertical de la escena. */
+.centro {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ------------------------------- Tipografía especial --------------------- */
+.titulo-grande {
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  font-weight: 650;
+  letter-spacing: -.02em;
+}
+.subtitulo { color: var(--muted); margin-top: 10px; font-size: 1.05rem; }
+
+/* La afirmación: serif suave, tamaño generoso, muy legible. */
+.afirmacion {
+  font-family: "Fraunces", Georgia, "Times New Roman", serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-size: clamp(1.6rem, 5.5vw, 2.4rem);
+  line-height: 1.25;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+}
+
+/* --------------------------------- Tarjetas ------------------------------ */
+.tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: clamp(20px, 4vw, 32px);
+  box-shadow: var(--sombra);
+}
+
+/* ---------------------------------- Botones ------------------------------ */
+.boton {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 550;
+  padding: 12px 18px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: transform var(--paso), background var(--paso), border-color var(--paso), box-shadow var(--paso);
+}
+.boton:hover { background: var(--surface-2); }
+.boton:active { transform: translateY(1px) scale(.99); }
+.boton:disabled { opacity: .45; cursor: not-allowed; }
+
+.boton-primario {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+  box-shadow: var(--sombra);
+}
+.boton-primario:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+
+.boton-suave { background: var(--surface-2); border-color: transparent; }
+
+.boton-grande { padding: 16px 22px; font-size: 1.05rem; width: 100%; }
+
+/* Botón de ícono cuadrado (tema, pantalla completa). */
+.boton-icono {
+  width: 40px; height: 40px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+}
+.boton-icono svg { width: 20px; height: 20px; }
+
+.fila-botones { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* --------------------------------- Campos -------------------------------- */
+.campo {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  transition: border-color var(--paso), box-shadow var(--paso);
+}
+.campo:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.etiqueta { display: block; font-weight: 550; margin-bottom: 8px; }
+textarea.campo { resize: vertical; min-height: 96px; line-height: 1.5; }
+
+.contador { text-align: right; color: var(--muted); font-size: .82rem; margin-top: 6px; }
+.contador.limite { color: var(--rojo); }
+
+/* ============================ OPCIONES (chips) ============================ */
+/* La “firma” de la app: tres tarjetas grandes y táctiles. */
+.opciones { display: grid; gap: 12px; margin-top: 8px; }
+
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 550;
+  font-size: 1.1rem;
+  color: var(--ink);
+  transition: transform var(--paso), border-color var(--paso), background var(--paso), box-shadow var(--paso);
+}
+.opcion:hover { transform: translateY(-2px); box-shadow: var(--sombra); }
+.opcion .emoji { font-size: 1.4rem; line-height: 1; }
+.opcion .marca-check {
+  margin-left: auto;
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--line);
+  display: grid; place-items: center;
+  transition: all var(--paso);
+}
+.opcion .marca-check svg { width: 14px; height: 14px; opacity: 0; transform: scale(.5); transition: all var(--paso); }
+
+/* Estado seleccionado, con el color semántico de cada opción. */
+.opcion[data-clave="acuerdo"].activa    { background: var(--verde-bg); border-color: var(--verde); }
+.opcion[data-clave="depende"].activa    { background: var(--ambar-bg); border-color: var(--ambar); }
+.opcion[data-clave="desacuerdo"].activa { background: var(--rojo-bg);  border-color: var(--rojo);  }
+
+.opcion[data-clave="acuerdo"].activa    .marca-check { background: var(--verde); border-color: var(--verde); }
+.opcion[data-clave="depende"].activa    .marca-check { background: var(--ambar); border-color: var(--ambar); }
+.opcion[data-clave="desacuerdo"].activa .marca-check { background: var(--rojo);  border-color: var(--rojo);  }
+.opcion.activa .marca-check svg { opacity: 1; transform: scale(1); color: #fff; }
+
+/* Cuando ya respondió, se atenúan las no elegidas. */
+.opciones.bloqueadas .opcion:not(.activa) { opacity: .5; }
+.opciones.bloqueadas .opcion { cursor: default; transform: none; box-shadow: none; }
+
+/* Despliegue suave del bloque de justificación al elegir una opción. */
+.zona-justificacion {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows var(--paso), opacity var(--paso), margin var(--paso);
+  margin-top: 0;
+}
+.zona-justificacion.visible {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 24px;
+}
+.zona-justificacion > .interior { overflow: hidden; }
+
+/* ============================== PROGRESO ================================= */
+.progreso { margin-bottom: 28px; }
+.progreso .fila {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .85rem; color: var(--muted); margin-bottom: 8px;
+}
+.progreso .fila .paso { font-weight: 600; color: var(--ink); }
+.barra-progreso {
+  height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden;
+}
+.barra-progreso .relleno {
+  height: 100%; width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width .5s cubic-bezier(.2,.7,.2,1);
+}
+
+/* Indicador “X de Y respuestas”. */
+.contador-respuestas {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--muted); font-size: .95rem;
+}
+.contador-respuestas b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.punto-vivo {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+  animation: latir 1.6s ease-in-out infinite;
+}
+@keyframes latir { 0%,100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
+
+/* ============================== RESULTADOS ============================== */
+.resultado { margin-bottom: 18px; }
+.resultado .encabezado {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px;
+}
+.resultado .nombre-opcion { font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.resultado .cifras { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
+.resultado .cifras b { color: var(--ink); }
+
+.pista { height: 40px; background: var(--surface-2); border-radius: 10px; overflow: hidden; }
+.pista .barra {
+  height: 100%; width: 0%;
+  border-radius: 10px;
+  transition: width .9s cubic-bezier(.2,.7,.2,1);
+}
+.resultado[data-clave="acuerdo"]    .barra { background: var(--verde); }
+.resultado[data-clave="depende"]    .barra { background: var(--ambar); }
+.resultado[data-clave="desacuerdo"] .barra { background: var(--rojo);  }
+
+/* Justificaciones como tarjetas apiladas. */
+.justificaciones { display: grid; gap: 12px; margin-top: 8px; }
+.tarjeta-justificacion {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  animation: aparecer .4s ease both;
+}
+.tarjeta-justificacion[data-clave="acuerdo"]    { border-left-color: var(--verde); }
+.tarjeta-justificacion[data-clave="depende"]    { border-left-color: var(--ambar); }
+.tarjeta-justificacion[data-clave="desacuerdo"] { border-left-color: var(--rojo);  }
+.tarjeta-justificacion .texto { font-size: 1.02rem; }
+.tarjeta-justificacion .autor { color: var(--muted); font-size: .82rem; margin-top: 8px; }
+
+@keyframes aparecer { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ============================ ESTADOS DE ESPERA ========================= */
+.estado-espera { text-align: center; padding: clamp(24px, 8vw, 60px) 0; }
+.estado-espera .icono {
+  width: 64px; height: 64px; margin: 0 auto 20px;
+  border-radius: 20px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.estado-espera .icono svg { width: 30px; height: 30px; }
+.estado-espera h2 { font-size: 1.5rem; }
+.estado-espera p { color: var(--muted); margin-top: 10px; }
+
+/* Puntitos animados de “esperando…”. */
+.puntos-espera { display: inline-flex; gap: 5px; margin-top: 18px; }
+.puntos-espera span {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
+  animation: rebote 1.2s ease-in-out infinite;
+}
+.puntos-espera span:nth-child(2) { animation-delay: .15s; }
+.puntos-espera span:nth-child(3) { animation-delay: .3s; }
+@keyframes rebote { 0%,80%,100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-6px); } }
+
+/* =============================== PANEL DOCENTE ========================= */
+.grilla-config { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.opcion-switch {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+}
+.opcion-switch .txt small { display: block; color: var(--muted); font-weight: 400; font-size: .8rem; }
+
+/* Interruptor accesible (checkbox estilizado). */
+.switch { position: relative; width: 44px; height: 26px; flex: none; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch .pista-sw {
+  position: absolute; inset: 0; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 999px; transition: all var(--paso);
+}
+.switch .perilla {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  background: var(--surface); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  transition: transform var(--paso);
+}
+.switch input:checked + .pista-sw { background: var(--accent); border-color: var(--accent); }
+.switch input:checked ~ .perilla { transform: translateX(18px); }
+.switch input:focus-visible + .pista-sw { box-shadow: 0 0 0 4px var(--accent-soft); }
+
+/* Caja del código + QR. */
+.caja-sala { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; }
+.codigo-sala {
+  font-family: "Fraunces", serif; font-weight: 600;
+  font-size: clamp(2.4rem, 9vw, 3.6rem); letter-spacing: .12em;
+  color: var(--accent);
+}
+.qr-caja { background: #fff; padding: 12px; border-radius: 14px; box-shadow: var(--sombra); }
+.qr-caja img, .qr-caja canvas { display: block; border-radius: 6px; }
+
+/* Lista de participantes como “fichas”. */
+.fichas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ficha {
+  padding: 6px 12px; border-radius: 999px; font-size: .9rem;
+  background: var(--surface-2); border: 1px solid var(--line);
+  animation: aparecer .35s ease both;
+}
+.ficha.respondio { background: var(--verde-bg); border-color: var(--verde-line); }
+
+/* Métricas del resumen final. */
+.metricas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.metrica { text-align: center; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.metrica .num { font-size: 2rem; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.metrica .rot { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+
+/* Panel de control pegado abajo en el panel docente. */
+.panel-control {
+  position: sticky; bottom: 0;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  padding: 14px 0; margin-top: 24px;
+}
+.panel-control .fila-botones { justify-content: center; }
+
+.seccion { margin-bottom: 28px; }
+.seccion > h2 { font-size: 1.1rem; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+.seccion > h2 .cont { color: var(--muted); font-weight: 500; font-size: .9rem; }
+
+.linea-separadora { height: 1px; background: var(--line); border: 0; margin: 24px 0; }
+
+/* ================================= Avisos =============================== */
+.avisos {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px; z-index: 50; pointer-events: none;
+}
+.aviso {
+  background: var(--ink); color: var(--bg);
+  padding: 12px 18px; border-radius: 12px; font-size: .92rem; font-weight: 500;
+  box-shadow: var(--sombra-fuerte);
+  animation: entrar-aviso .3s ease both;
+}
+.aviso.saliendo { animation: salir-aviso .4s ease forwards; }
+@keyframes entrar-aviso { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes salir-aviso  { to { opacity: 0; transform: translateY(12px); } }
+
+/* =============================== Responsive ============================= */
+@media (max-width: 560px) {
+  .grilla-config { grid-template-columns: 1fr; }
+  .caja-sala { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .metricas { grid-template-columns: 1fr; }
+  .panel-control .fila-botones { flex-direction: column; }
+  .panel-control .boton { width: 100%; }
+}
+
+/* Respeta a quienes piden menos movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* ---- Íconos de tema: muestra luna en modo claro y sol en modo oscuro ---- */
+.icono-sol, .icono-luna { display: none; }
+:root[data-tema="claro"] .icono-luna { display: block; }
+:root[data-tema="oscuro"] .icono-sol { display: block; }
