@@ -1,12 +1,8 @@
 /* =============================================================================
  *  docente.js  —  Lógica del panel de la docente
- * -----------------------------------------------------------------------------
- *  Crea la sala, muestra el código y el QR, sigue en vivo a las participantes,
- *  controla el ritmo (una afirmación por vez, cerrar respuestas, mostrar
- *  resultados) y al final arma el resumen y permite exportar.
  * ========================================================================== */
 
-import { AFIRMACIONES, AJUSTES_DEFECTO } from "./config.js";
+import { PREGUNTAS, AJUSTES_DEFECTO } from "./config.js";
 import {
   crearSala, obtenerSala, actualizarSala,
   escucharSala, escucharParticipantes, escucharRespuestas
@@ -16,23 +12,21 @@ import {
   generarCodigoSala, mezclarArreglo, dibujarQR, copiarAlPortapapeles,
   formatearTiempo, armarFilas, exportarCSV, exportarExcel, exportarJSON, escaparHTML
 } from "./utils.js";
-import { renderBarras, renderJustificaciones } from "./vistas.js";
+import { renderBarras, renderMultiple, renderDesarrollo, renderJustificaciones } from "./vistas.js";
 
-/* ---------------------------- Estado local ------------------------------- */
 let codigo = null;
 let sala = null;
 let participantes = [];
 let respuestas = [];
-let timerBloqueo = null;   // para cerrar automáticamente al vencer el tiempo
+let timerBloqueo = null;
 
 const $ = (id) => document.getElementById(id);
 
 /* ---------------------------- Arranque ----------------------------------- */
 inicializarTema($("btn-tema"));
 $("btn-pantalla").addEventListener("click", alternarPantallaCompleta);
-$("cant-afirmaciones").textContent = AFIRMACIONES.length;
+$("cant-afirmaciones").textContent = PREGUNTAS.length;
 
-// Si había una sala en curso (por si se recargó la página), la retomamos.
 const guardado = localStorage.getItem("salaDocente");
 if (guardado) reanudar(guardado);
 
@@ -42,13 +36,12 @@ $("btn-crear").addEventListener("click", crear);
 async function crear() {
   codigo = generarCodigoSala();
 
-  // Tomamos las afirmaciones (mezcladas si se pidió).
   const mezclar = $("cfg-mezclar").checked;
-  const afirmaciones = mezclar ? mezclarArreglo(AFIRMACIONES) : [...AFIRMACIONES];
+  const preguntas = mezclar ? mezclarArreglo(PREGUNTAS) : [...PREGUNTAS];
 
   const config = {
-    afirmaciones,
-    mezclarAfirmaciones: mezclar,
+    preguntas,
+    mezclarPreguntas: mezclar,
     permitirSeudonimo: $("cfg-seudonimo").checked,
     mostrarNombres: $("cfg-nombres").checked,
     permitirEdicion: $("cfg-editar").checked,
@@ -69,7 +62,6 @@ async function crear() {
   }
 }
 
-/* Retoma una sala existente tras recargar la página. */
 async function reanudar(cod) {
   const datos = await obtenerSala(cod);
   if (!datos || datos.estado === "final") { localStorage.removeItem("salaDocente"); return; }
@@ -77,12 +69,10 @@ async function reanudar(cod) {
   abrirActividad();
 }
 
-/* Pasa de la pantalla de creación a la de actividad y engancha los listeners. */
 function abrirActividad() {
   $("vista-crear").classList.add("oculto");
   $("vista-actividad").classList.remove("oculto");
 
-  // Código, enlace y QR.
   const url = new URL(`estudiante.html?sala=${codigo}`, location.href).href;
   $("codigo-sala").textContent = codigo;
   $("link-estudiante").href = url;
@@ -94,55 +84,40 @@ function abrirActividad() {
 
   conectarControles();
 
-  // Escuchas en tiempo real.
   escucharSala(codigo, (d) => { sala = d; render(); });
   escucharParticipantes(codigo, (l) => { participantes = l; render(); });
   escucharRespuestas(codigo, (l) => { respuestas = l; render(); });
 }
 
-/* ======================= Botones del panel de control =================== */
+/* ======================= Controles del panel ============================ */
 function conectarControles() {
-  // Iniciar: pasa de la sala de espera a la primera afirmación.
-  $("ctrl-iniciar").onclick = () => irAAfirmacion(0);
-
-  // Cerrar / reabrir respuestas de la afirmación actual.
+  $("ctrl-iniciar").onclick = () => irAPregunta(0);
   $("ctrl-bloquear").onclick = () => actualizarSala(codigo, { bloqueada: !sala.bloqueada });
-
-  // Mostrar / ocultar resultados para toda la clase.
   $("ctrl-resultados").onclick = () => {
     const nuevo = sala.estado === "resultados" ? "pregunta" : "resultados";
     actualizarSala(codigo, { estado: nuevo });
   };
-
-  // Mostrar / ocultar las justificaciones.
   $("ctrl-justificaciones").onclick = () =>
     actualizarSala(codigo, { mostrarJustificaciones: !sala.mostrarJustificaciones });
-
-  // Permitir / bloquear la edición de respuestas.
   $("ctrl-editar").onclick = () =>
     actualizarSala(codigo, { permitirEdicion: !sala.permitirEdicion });
-
-  // Siguiente afirmación (o finalizar si era la última).
   $("ctrl-siguiente").onclick = () => {
     const siguiente = sala.indiceActual + 1;
-    if (siguiente < sala.afirmaciones.length) irAAfirmacion(siguiente);
+    if (siguiente < sala.preguntas.length) irAPregunta(siguiente);
     else finalizar();
   };
-
   $("ctrl-finalizar").onclick = finalizar;
 
-  // Exportaciones (disponibles en cualquier momento).
-  $("exp-csv").onclick   = () => exportarCSV(armarFilas(respuestas), `alfabetizacion-${codigo}.csv`);
-  $("exp-excel").onclick = () => exportarExcel(armarFilas(respuestas), `alfabetizacion-${codigo}.xlsx`);
-  $("exp-json").onclick  = () => exportarJSON(armarFilas(respuestas), `alfabetizacion-${codigo}.json`);
-
-  $("fin-csv").onclick   = () => exportarCSV(armarFilas(respuestas), `alfabetizacion-${codigo}.csv`);
-  $("fin-excel").onclick = () => exportarExcel(armarFilas(respuestas), `alfabetizacion-${codigo}.xlsx`);
-  $("fin-json").onclick  = () => exportarJSON(armarFilas(respuestas), `alfabetizacion-${codigo}.json`);
+  const exportar = (fn, ext) => () => fn(armarFilas(respuestas, sala?.preguntas), `alfabetizacion-${codigo}.${ext}`);
+  $("exp-csv").onclick   = exportar(exportarCSV, "csv");
+  $("exp-excel").onclick = exportar(exportarExcel, "xlsx");
+  $("exp-json").onclick  = exportar(exportarJSON, "json");
+  $("fin-csv").onclick   = exportar(exportarCSV, "csv");
+  $("fin-excel").onclick = exportar(exportarExcel, "xlsx");
+  $("fin-json").onclick  = exportar(exportarJSON, "json");
 }
 
-/* Va a una afirmación: reinicia el estado (abierta, sin resultados, timer nuevo). */
-function irAAfirmacion(indice) {
+function irAPregunta(indice) {
   actualizarSala(codigo, {
     estado: "pregunta",
     indiceActual: indice,
@@ -151,16 +126,14 @@ function irAAfirmacion(indice) {
   });
 }
 
-/* Finaliza la actividad y muestra el resumen. */
 function finalizar() {
   actualizarSala(codigo, { estado: "final" });
 }
 
-/* ============================ Render principal =========================== */
+/* ============================ Render ==================================== */
 function render() {
   if (!sala) return;
 
-  // Si terminó, mostramos el resumen y limpiamos.
   if (sala.estado === "final") {
     localStorage.removeItem("salaDocente");
     detenerTimerBloqueo();
@@ -174,41 +147,40 @@ function render() {
   gestionarTimerBloqueo();
 }
 
-/* ------------------------- Lista de participantes ------------------------ */
 function renderParticipantes() {
   const cont = $("lista-participantes");
   $("cont-participantes").textContent = `${participantes.length} en la sala`;
   $("sin-participantes").classList.toggle("oculto", participantes.length > 0);
 
-  // Quiénes ya respondieron la afirmación actual.
   const respondieron = new Set(
     respuestas.filter((r) => r.indice === sala.indiceActual).map((r) => r.idParticipante)
   );
-
-  cont.innerHTML = participantes.map((p) => `
-    <span class="ficha ${respondieron.has(p.id) ? "respondio" : ""}">${escaparHTML(p.nombre)}</span>
-  `).join("");
+  cont.innerHTML = participantes.map((p) =>
+    `<span class="ficha ${respondieron.has(p.id) ? "respondio" : ""}">${escaparHTML(p.nombre)}</span>`
+  ).join("");
 }
 
-/* --------------------- Afirmación actual + resultados -------------------- */
 function renderEstadoActual() {
-  const total = sala.afirmaciones.length;
+  const total = sala.preguntas?.length || 0;
   const i = sala.indiceActual;
   const enSala = sala.estado === "sala";
+  const pregunta = sala.preguntas?.[i];
 
-  // Encabezado y progreso.
   if (enSala) {
     $("doc-paso").textContent = "Sala de espera";
     $("doc-relleno").style.width = "0%";
     $("doc-afirmacion").textContent = "Cuando estén todas, tocá «Iniciar actividad».";
+    $("doc-tipo-badge").textContent = "";
   } else {
     const etiqueta = sala.estado === "resultados" ? " · resultados" : "";
     $("doc-paso").textContent = `Pregunta ${i + 1} de ${total}${etiqueta}`;
     $("doc-relleno").style.width = `${((i + 1) / total) * 100}%`;
-    $("doc-afirmacion").textContent = sala.afirmaciones[i];
+    $("doc-afirmacion").textContent = pregunta?.texto || "";
+    // Badge con el tipo de pregunta
+    const tipos = { debate: "Debate", siNo: "Sí / No", desarrollo: "Desarrollo", multiple: "Múltiple opción" };
+    $("doc-tipo-badge").textContent = tipos[pregunta?.tipo] || "";
   }
 
-  // Contador “X de Y respondieron” (solo con actividad activa).
   const contador = $("doc-contador");
   contador.style.visibility = enSala ? "hidden" : "visible";
   const respondieron = new Set(
@@ -217,28 +189,55 @@ function renderEstadoActual() {
   $("doc-respondieron").textContent = respondieron;
   $("doc-total").textContent = participantes.length;
 
-  // Vista previa de resultados: solo cuando están “mostrados”.
+  // Resultados en el panel docente
   const zona = $("doc-resultados");
-  if (sala.estado === "resultados") {
+  if (sala.estado === "resultados" && pregunta) {
     zona.classList.remove("oculto");
     const deEsta = respuestas.filter((r) => r.indice === i);
-    renderBarras($("doc-barras"), deEsta);
-    if (sala.mostrarJustificaciones) {
-      renderJustificaciones($("doc-justificaciones"), deEsta, sala.mostrarNombres);
-      $("doc-justificaciones").classList.remove("oculto");
-    } else {
-      $("doc-justificaciones").innerHTML = `<p class="subtitulo" style="font-size:.9rem;">Justificaciones ocultas.</p>`;
+
+    switch (pregunta.tipo) {
+      case "debate":
+        renderBarras($("doc-barras"), deEsta, "debate");
+        $("doc-barras").classList.remove("oculto");
+        if (sala.mostrarJustificaciones) {
+          renderJustificaciones($("doc-justificaciones"), deEsta, sala.mostrarNombres);
+          $("doc-justificaciones").classList.remove("oculto");
+        } else {
+          $("doc-justificaciones").innerHTML = `<p class="subtitulo" style="font-size:.9rem;">Justificaciones ocultas.</p>`;
+        }
+        break;
+      case "siNo":
+        renderBarras($("doc-barras"), deEsta, "siNo");
+        $("doc-barras").classList.remove("oculto");
+        if (sala.mostrarJustificaciones) {
+          renderJustificaciones($("doc-justificaciones"), deEsta, sala.mostrarNombres);
+          $("doc-justificaciones").classList.remove("oculto");
+        } else {
+          $("doc-justificaciones").innerHTML = `<p class="subtitulo" style="font-size:.9rem;">Justificaciones ocultas.</p>`;
+        }
+        break;
+      case "multiple":
+        renderMultiple($("doc-barras"), deEsta, pregunta.opciones || []);
+        $("doc-barras").classList.remove("oculto");
+        $("doc-justificaciones").classList.add("oculto");
+        break;
+      case "desarrollo":
+        $("doc-barras").classList.add("oculto");
+        $("doc-justificaciones").classList.remove("oculto");
+        $("doc-justificaciones").previousElementSibling?.querySelector("h2") &&
+          ($("doc-justificaciones").previousElementSibling.querySelector("h2").textContent = "Respuestas");
+        renderDesarrollo($("doc-justificaciones"), deEsta, sala.mostrarNombres);
+        break;
     }
   } else {
     zona.classList.add("oculto");
   }
 }
 
-/* ------------------- Estado/etiquetas de los botones -------------------- */
 function renderControles() {
   const enSala = sala.estado === "sala";
   const enResultados = sala.estado === "resultados";
-  const esUltima = sala.indiceActual >= sala.afirmaciones.length - 1;
+  const esUltima = sala.indiceActual >= (sala.preguntas?.length || 1) - 1;
 
   $("ctrl-iniciar").classList.toggle("oculto", !enSala);
   $("ctrl-siguiente").classList.toggle("oculto", enSala);
@@ -256,26 +255,19 @@ function renderControles() {
   $("ctrl-editar").disabled = enSala;
   $("ctrl-editar").textContent = sala.permitirEdicion ? "Bloquear modificación" : "Permitir modificar";
 
-  $("ctrl-siguiente").textContent = esUltima ? "Finalizar actividad" : "Siguiente afirmación";
+  $("ctrl-siguiente").textContent = esUltima ? "Finalizar actividad" : "Siguiente pregunta";
 
-  // Exportar solo tiene sentido si ya hay respuestas.
   const hay = respuestas.length > 0;
   ["exp-csv", "exp-excel", "exp-json"].forEach((id) => { $(id).disabled = !hay; });
 }
 
-/* ---------------- Cierre automático por temporizador -------------------- */
 function gestionarTimerBloqueo() {
   detenerTimerBloqueo();
   const seg = sala.segundosTemporizador;
   if (sala.estado !== "pregunta" || sala.bloqueada || !seg || !sala.inicioPreguntaMs) return;
-
   const restanteMs = seg * 1000 - (Date.now() - sala.inicioPreguntaMs);
-  if (restanteMs <= 0) {
-    actualizarSala(codigo, { bloqueada: true });   // ya venció → cerrar
-  } else {
-    // Programamos el cierre para cuando se cumpla el tiempo.
-    timerBloqueo = setTimeout(() => actualizarSala(codigo, { bloqueada: true }), restanteMs);
-  }
+  if (restanteMs <= 0) actualizarSala(codigo, { bloqueada: true });
+  else timerBloqueo = setTimeout(() => actualizarSala(codigo, { bloqueada: true }), restanteMs);
 }
 function detenerTimerBloqueo() {
   if (timerBloqueo) { clearTimeout(timerBloqueo); timerBloqueo = null; }
@@ -290,20 +282,35 @@ function mostrarResumen() {
   $("fin-participantes").textContent = participantes.length;
   $("fin-respuestas").textContent = respuestas.length;
 
-  // Tiempo promedio de respuesta.
   const tiempos = respuestas.map((r) => r.tiempoMs).filter((t) => t > 0);
   const promedio = tiempos.length ? tiempos.reduce((a, b) => a + b, 0) / tiempos.length : 0;
   $("fin-tiempo").textContent = promedio ? formatearTiempo(promedio) : "—";
 
-  // Distribución por afirmación (una tarjeta con barras por cada una).
   const cont = $("fin-distribucion");
   cont.innerHTML = "";
-  sala.afirmaciones.forEach((texto, idx) => {
+
+  (sala.preguntas || []).forEach((pregunta, idx) => {
     const bloque = document.createElement("div");
     bloque.className = "tarjeta";
     bloque.style.marginBottom = "14px";
-    bloque.innerHTML = `<p class="afirmacion" style="font-size:1.1rem; margin-bottom:16px;">${escaparHTML(texto)}</p><div class="barras-fin"></div>`;
+
+    const tipos = { debate: "Debate", siNo: "Sí / No", desarrollo: "Desarrollo libre", multiple: "Múltiple opción" };
+    bloque.innerHTML = `
+      <p style="font-size:.8rem; color:var(--muted); margin-bottom:4px;">${tipos[pregunta.tipo] || ""}</p>
+      <p class="afirmacion" style="font-size:1.05rem; margin-bottom:14px;">${escaparHTML(pregunta.texto)}</p>
+      <div class="area-resumen-fin"></div>`;
     cont.appendChild(bloque);
-    renderBarras(bloque.querySelector(".barras-fin"), respuestas.filter((r) => r.indice === idx));
+
+    const area = bloque.querySelector(".area-resumen-fin");
+    const deEsta = respuestas.filter((r) => r.indice === idx);
+
+    switch (pregunta.tipo) {
+      case "debate":  renderBarras(area, deEsta, "debate"); break;
+      case "siNo":    renderBarras(area, deEsta, "siNo"); break;
+      case "multiple": renderMultiple(area, deEsta, pregunta.opciones || []); break;
+      case "desarrollo":
+        renderDesarrollo(area, deEsta, false);
+        break;
+    }
   });
 }
