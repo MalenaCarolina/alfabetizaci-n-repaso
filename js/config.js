@@ -18,12 +18,13 @@
  * 1) CLAVES DE FIREBASE
  * -------------------------------------------------------------------------- */
 export const firebaseConfig = {
-  apiKey:            "PEGAR_AQUI_TU_API_KEY",
-  authDomain:        "PEGAR_AQUI.firebaseapp.com",
-  projectId:         "PEGAR_AQUI_TU_PROJECT_ID",
-  storageBucket:     "PEGAR_AQUI.appspot.com",
-  messagingSenderId: "PEGAR_AQUI",
-  appId:             "PEGAR_AQUI"
+  apiKey: "AIzaSyBvrMNutUUhQfsqbhlGGUEH5r5CEiaEenY",
+  authDomain: "alfabetizacion-clase.firebaseapp.com",
+  projectId: "alfabetizacion-clase",
+  storageBucket: "alfabetizacion-clase.firebasestorage.app",
+  messagingSenderId: "88053687683",
+  appId: "1:88053687683:web:d49cee28cf6d2ca1b942b6",
+  measurementId: "G-DD8ZXVHGW1"
 };
 
 
