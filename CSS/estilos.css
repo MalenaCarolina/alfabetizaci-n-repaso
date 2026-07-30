@@ -469,3 +469,85 @@ textarea.campo { resize: vertical; min-height: 96px; line-height: 1.5; }
 .icono-sol, .icono-luna { display: none; }
 :root[data-tema="claro"] .icono-luna { display: block; }
 :root[data-tema="oscuro"] .icono-sol { display: block; }
+
+/* ======================== Selección múltiple ============================ */
+.opciones-multiple {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.opcion-multiple {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color .18s, background .18s;
+  font-size: .98rem;
+  line-height: 1.4;
+  user-select: none;
+}
+
+.opcion-multiple input[type=checkbox] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.marca-check-box {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .18s, border-color .18s;
+  margin-top: 1px;
+}
+
+.marca-check-box svg {
+  width: 13px;
+  height: 13px;
+  stroke: white;
+  opacity: 0;
+  transition: opacity .15s;
+}
+
+.opcion-multiple.activa {
+  border-color: var(--acento);
+  background: color-mix(in srgb, var(--acento) 8%, transparent);
+}
+
+.opcion-multiple.activa .marca-check-box {
+  background: var(--acento);
+  border-color: var(--acento);
+}
+
+.opcion-multiple.activa .marca-check-box svg {
+  opacity: 1;
+}
+
+.opcion-multiple:hover:not(.activa) {
+  border-color: var(--acento);
+  background: color-mix(in srgb, var(--acento) 4%, transparent);
+}
+
+/* Badge de tipo de pregunta en el panel docente */
+.tipo-badge {
+  display: inline-block;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--acento);
+  background: color-mix(in srgb, var(--acento) 10%, transparent);
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
