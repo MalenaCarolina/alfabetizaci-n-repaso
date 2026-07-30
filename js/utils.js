@@ -6,10 +6,12 @@
  *  los resultados a CSV / Excel / JSON. Nada de esto habla con Firestore.
  * ========================================================================== */
 
-import { OPCIONES } from "./config.js";
+import { OPCIONES_DEBATE, OPCIONES_SI_NO } from "./config.js";
 
 /* --- Diccionario opción → texto legible (ej. "acuerdo" → "De acuerdo") ------ */
-const TEXTO_OPCION = Object.fromEntries(OPCIONES.map((o) => [o.clave, o.texto]));
+const TEXTO_OPCION = Object.fromEntries(
+  [...OPCIONES_DEBATE, ...OPCIONES_SI_NO].map((o) => [o.clave, o.texto])
+);
 export const textoDeOpcion = (clave) => TEXTO_OPCION[clave] ?? clave;
 
 
@@ -168,21 +170,37 @@ export function dibujarQR(contenedor, url, tamano = 220) {
  * Cada fila es lo que pide la consigna: nombre, fecha, hora, número y texto de
  * la afirmación, respuesta, justificación y tiempo que tardó.
  */
-export function armarFilas(respuestas) {
+export function armarFilas(respuestas, preguntas = []) {
   return respuestas
     .slice()
     .sort((a, b) => (a.indice - b.indice) || 0)
     .map((r) => {
       const fecha = r.creadaEn?.toDate ? r.creadaEn.toDate() : new Date();
+      const tipo = r.tipoPregunta || "debate";
+
+      // "Respuesta" varía según el tipo
+      let respuesta = "";
+      if (tipo === "debate" || tipo === "siNo") {
+        respuesta = textoDeOpcion(r.opcion);
+      } else if (tipo === "multiple") {
+        respuesta = Array.isArray(r.opciones) ? r.opciones.join(" | ") : "";
+      } else if (tipo === "desarrollo") {
+        respuesta = r.respuesta || "";
+      }
+
+      // "Justificación" solo aplica a debate/siNo
+      const justificacion = (tipo === "debate" || tipo === "siNo") ? (r.justificacion || "") : "";
+
       return {
-        "Nombre":        r.nombre || "",
-        "Fecha":         fecha.toLocaleDateString("es-AR"),
-        "Hora":          fecha.toLocaleTimeString("es-AR"),
-        "N° afirmación": r.indice + 1,
-        "Afirmación":    r.afirmacion || "",
-        "Respuesta":     textoDeOpcion(r.opcion),
-        "Justificación": r.justificacion || "",
-        "Tiempo (s)":    r.tiempoMs ? Math.round(r.tiempoMs / 1000) : ""
+        "Nombre":       r.nombre || "",
+        "Fecha":        fecha.toLocaleDateString("es-AR"),
+        "Hora":         fecha.toLocaleTimeString("es-AR"),
+        "N° pregunta":  r.indice + 1,
+        "Tipo":         tipo,
+        "Pregunta":     r.textoPregunta || "",
+        "Respuesta":    respuesta,
+        "Justificación": justificacion,
+        "Tiempo (s)":   r.tiempoMs ? Math.round(r.tiempoMs / 1000) : ""
       };
     });
 }
