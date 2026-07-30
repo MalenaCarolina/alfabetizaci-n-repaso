@@ -1,12 +1,8 @@
 /* =============================================================================
  *  estudiante.js  —  Lógica de la vista de las estudiantes
- * -----------------------------------------------------------------------------
- *  Se encarga de: ingresar a la sala, mostrar la afirmación activa, registrar
- *  la respuesta con su justificación, y cambiar de pantalla según lo que la
- *  docente vaya habilitando (todo en tiempo real).
  * ========================================================================== */
 
-import { OPCIONES, MAX_CARACTERES_JUSTIFICACION } from "./config.js";
+import { OPCIONES_DEBATE, OPCIONES_SI_NO, MAX_CARACTERES } from "./config.js";
 import {
   obtenerSala, unirseComoParticipante, escucharSala,
   escucharParticipantes, escucharRespuestas, guardarRespuesta
@@ -15,36 +11,34 @@ import {
   inicializarTema, alternarPantallaCompleta, avisar,
   generarId, formatearTiempo
 } from "./utils.js";
-import { renderBarras, renderJustificaciones } from "./vistas.js";
+import { renderBarras, renderMultiple, renderDesarrollo, renderJustificaciones } from "./vistas.js";
 
-/* ------------------------- Estado local en memoria ------------------------ */
+/* ------------------------- Estado local ----------------------------------- */
 const codigo = (new URLSearchParams(location.search).get("sala") || "").toUpperCase();
 let idParticipante = null;
 let nombre = "";
-let sala = null;                 // último estado de la sala
-let participantes = [];          // lista de participantes
-let respuestas = [];             // todas las respuestas de la sala
-let opcionElegida = null;        // opción seleccionada en la pregunta actual
-let indiceRenderizado = -99;     // para detectar cambio de afirmación
-let cuandoAparecio = 0;          // marca de tiempo para medir cuánto tarda
-let editando = false;            // true si la estudiante pidió modificar
-let intervaloTimer = null;       // temporizador visual
+let sala = null;
+let participantes = [];
+let respuestas = [];
+let opcionElegida = null;       // para debate / siNo
+let opcionesElegidas = new Set(); // para múltiple
+let indiceRenderizado = -99;
+let cuandoAparecio = 0;
+let editando = false;
+let intervaloTimer = null;
 
-/* --------------------------- Atajos al DOM -------------------------------- */
 const $ = (id) => document.getElementById(id);
+
 const vistas = {
-  nombre:      $("vista-nombre"),
-  sala:        $("vista-sala"),
-  pregunta:    $("vista-pregunta"),
-  respondido:  $("vista-respondido"),
-  cerrada:     $("vista-cerrada"),
-  resultados:  $("vista-resultados"),
-  final:       $("vista-final")
+  nombre:     $("vista-nombre"),
+  sala:       $("vista-sala"),
+  pregunta:   $("vista-pregunta"),
+  resultados: $("vista-resultados"),
+  final:      $("vista-final")
 };
 
-/* Muestra una sola de las “vistas grandes” y oculta las demás. */
 function mostrarVista(clave) {
-  ["nombre", "sala", "pregunta", "resultados", "final"].forEach((k) => {
+  Object.keys(vistas).forEach((k) => {
     vistas[k].classList.toggle("oculto", k !== clave);
   });
 }
@@ -52,20 +46,18 @@ function mostrarVista(clave) {
 /* ============================ Arranque ==================================== */
 inicializarTema($("btn-tema"));
 $("btn-pantalla").addEventListener("click", alternarPantallaCompleta);
-
-// Aplicamos el máximo de caracteres definido en config.js (un solo lugar a editar).
-$("justificacion").maxLength = MAX_CARACTERES_JUSTIFICACION;
-$("max-caracteres").textContent = MAX_CARACTERES_JUSTIFICACION;
+$("justificacion").maxLength = MAX_CARACTERES;
+$("max-caracteres").textContent = MAX_CARACTERES;
+$("txt-desarrollo").maxLength = MAX_CARACTERES;
+$("max-caracteres-dev").textContent = MAX_CARACTERES;
 
 if (!codigo) {
-  // Sin código no hay nada que hacer: volvemos al inicio.
   location.href = "index.html";
 } else {
   iniciar();
 }
 
 async function iniciar() {
-  // 1) Verificamos que la sala exista y leemos su configuración.
   const datos = await obtenerSala(codigo);
   if (!datos) {
     vistas.nombre.classList.remove("oculto");
@@ -76,13 +68,11 @@ async function iniciar() {
     return;
   }
 
-  // Ajustamos el texto según si se permite seudónimo.
   if (datos.permitirSeudonimo) {
     $("sub-nombre").textContent = "Escribí tu nombre o un seudónimo para entrar.";
     $("etiqueta-nombre").textContent = "Tu nombre o seudónimo";
   }
 
-  // 2) ¿Ya estábamos en esta sala? (recuperamos identidad tras recargar)
   const guardado = JSON.parse(localStorage.getItem("part_" + codigo) || "null");
   if (guardado?.id && guardado?.nombre) {
     idParticipante = guardado.id;
@@ -93,7 +83,7 @@ async function iniciar() {
   }
 }
 
-/* --------------------------- Ingreso con nombre --------------------------- */
+/* --------------------------- Ingreso -------------------------------------- */
 function prepararIngreso() {
   mostrarVista("nombre");
   const input = $("nombre");
@@ -116,25 +106,22 @@ function prepararIngreso() {
   input.focus();
 }
 
-/* --------------- Conexión en tiempo real (sala + datos) ------------------ */
+/* ------------------------- Conexión --------------------------------------- */
 function conectar() {
-  escucharSala(codigo, (datos) => { sala = datos; render(); });
-  escucharParticipantes(codigo, (lista) => { participantes = lista; render(); });
-  escucharRespuestas(codigo, (lista) => { respuestas = lista; render(); });
+  escucharSala(codigo, (d) => { sala = d; render(); });
+  escucharParticipantes(codigo, (l) => { participantes = l; render(); });
+  escucharRespuestas(codigo, (l) => { respuestas = l; render(); });
 }
 
-/* ============================ Render principal ============================ */
-/* Se llama cada vez que cambia algo. Decide qué pantalla mostrar. */
+/* ============================ Render ====================================== */
 function render() {
   if (!sala) return;
 
-  const progreso = $("progreso");
-  const total = sala.afirmaciones?.length || 0;
+  const total = sala.preguntas?.length || 0;
   const i = sala.indiceActual;
-
-  // Barra de progreso (solo durante la actividad).
   const enActividad = sala.estado === "pregunta" || sala.estado === "resultados";
-  progreso.classList.toggle("oculto", !enActividad);
+
+  $("progreso").classList.toggle("oculto", !enActividad);
   if (enActividad && i >= 0) {
     $("txt-paso").textContent = `Pregunta ${i + 1} de ${total}`;
     $("relleno-progreso").style.width = `${((i + 1) / total) * 100}%`;
@@ -148,7 +135,9 @@ function render() {
   }
 }
 
-/* --------- Respuestas de la afirmación activa y la mía (si existe) -------- */
+function preguntaActual() {
+  return sala.preguntas?.[sala.indiceActual] || null;
+}
 function respuestasActuales() {
   return respuestas.filter((r) => r.indice === sala.indiceActual);
 }
@@ -160,48 +149,67 @@ function miRespuestaActual() {
 function renderPregunta() {
   mostrarVista("pregunta");
 
-  const i = sala.indiceActual;
-  const afirmacion = sala.afirmaciones[i] || "";
-  $("afirmacion").textContent = afirmacion;
+  const pregunta = preguntaActual();
+  if (!pregunta) return;
 
+  $("afirmacion").textContent = pregunta.texto;
   const mia = miRespuestaActual();
   const puedeEditar = sala.permitirEdicion;
 
-  // Caso 1: ya respondí y (no puedo editar, o no estoy editando) → esperar.
+  // Ya respondí → mostrar estado de espera
   if (mia && !(editando && puedeEditar)) {
     mostrarEstadoRespondido(puedeEditar);
     return;
   }
 
-  // Caso 2: la pregunta está cerrada y no respondí → aviso de cierre.
+  // Cerrada sin responder
   if (sala.bloqueada && !mia) {
-    vistas.pregunta.querySelectorAll(".opciones, .zona-justificacion").forEach((el) => el.classList.add("oculto"));
+    ocultarFormularios();
     $("vista-respondido").classList.add("oculto");
     $("vista-cerrada").classList.remove("oculto");
     detenerTimer();
     return;
   }
 
-  // Caso 3: puedo responder → mostramos el formulario.
+  // Formulario activo
   $("vista-cerrada").classList.add("oculto");
   $("vista-respondido").classList.add("oculto");
-  $("opciones").classList.remove("oculto");
 
-  // Si cambió la afirmación (o entré a editar), reiniciamos el formulario.
-  const clave = editando ? `${i}-edit` : i;
+  const clave = editando ? `${sala.indiceActual}-edit` : sala.indiceActual;
   if (indiceRenderizado !== clave) {
     indiceRenderizado = clave;
-    construirFormulario(mia);
-    cuandoAparecio = Date.now();          // arrancamos a medir el tiempo
+    cuandoAparecio = Date.now();
+    construirFormulario(pregunta, mia);
     iniciarTimer();
   }
 }
 
-/* Construye las tres opciones y el cuadro de justificación. */
-function construirFormulario(respuestaPrevia) {
+function ocultarFormularios() {
+  $("bloque-debate").classList.add("oculto");
+  $("bloque-desarrollo").classList.add("oculto");
+  $("bloque-multiple").classList.add("oculto");
+}
+
+/* Construye el formulario según el tipo de pregunta */
+function construirFormulario(pregunta, respuestaPrevia) {
+  ocultarFormularios();
+
+  switch (pregunta.tipo) {
+    case "debate":    construirDebate(OPCIONES_DEBATE, respuestaPrevia); break;
+    case "siNo":      construirDebate(OPCIONES_SI_NO, respuestaPrevia); break;
+    case "desarrollo": construirDesarrollo(respuestaPrevia); break;
+    case "multiple":  construirMultiple(pregunta.opciones || [], respuestaPrevia); break;
+  }
+}
+
+/* --- Debate / SiNo -------------------------------------------------------- */
+function construirDebate(opciones, respuestaPrevia) {
+  const bloque = $("bloque-debate");
+  bloque.classList.remove("oculto");
+
   const cont = $("opciones");
   cont.classList.remove("bloqueadas");
-  cont.innerHTML = OPCIONES.map((op) => `
+  cont.innerHTML = opciones.map((op) => `
     <button type="button" class="opcion" role="radio" aria-checked="false" data-clave="${op.clave}">
       <span class="emoji" aria-hidden="true">${op.emoji}</span>
       <span>${op.texto}</span>
@@ -215,7 +223,6 @@ function construirFormulario(respuestaPrevia) {
   const contador = $("contador");
   const enviar = $("btn-enviar");
 
-  // Estado inicial: nada elegido, justificación vacía.
   opcionElegida = respuestaPrevia?.opcion || null;
   texto.value = respuestaPrevia?.justificacion || "";
   contador.textContent = texto.value.length;
@@ -224,7 +231,6 @@ function construirFormulario(respuestaPrevia) {
     enviar.disabled = !(opcionElegida && texto.value.trim().length > 0);
   };
 
-  // Selección de opción.
   cont.querySelectorAll(".opcion").forEach((btn) => {
     btn.addEventListener("click", () => {
       opcionElegida = btn.dataset.clave;
@@ -233,13 +239,12 @@ function construirFormulario(respuestaPrevia) {
         b.classList.toggle("activa", activa);
         b.setAttribute("aria-checked", activa ? "true" : "false");
       });
-      zona.classList.add("visible");      // despliega la justificación
+      zona.classList.add("visible");
       texto.focus();
       revisarEnvio();
     });
   });
 
-  // Si venía con respuesta previa (edición), reflejamos la selección.
   if (opcionElegida) {
     const btn = cont.querySelector(`.opcion[data-clave="${opcionElegida}"]`);
     if (btn) { btn.classList.add("activa"); btn.setAttribute("aria-checked", "true"); }
@@ -248,74 +253,162 @@ function construirFormulario(respuestaPrevia) {
     zona.classList.remove("visible");
   }
 
-  // Contador de caracteres.
   texto.addEventListener("input", () => {
     contador.textContent = texto.value.length;
-    contador.parentElement.classList.toggle("limite", texto.value.length >= MAX_CARACTERES_JUSTIFICACION);
+    contador.parentElement.classList.toggle("limite", texto.value.length >= MAX_CARACTERES);
     revisarEnvio();
   });
 
   enviar.disabled = true;
   revisarEnvio();
-  enviar.onclick = enviarRespuesta;
+  enviar.onclick = () => enviarDebate();
 }
 
-/* Envía la respuesta a Firestore. */
-async function enviarRespuesta() {
+/* --- Desarrollo libre ----------------------------------------------------- */
+function construirDesarrollo(respuestaPrevia) {
+  const bloque = $("bloque-desarrollo");
+  bloque.classList.remove("oculto");
+
+  const texto = $("txt-desarrollo");
+  const contador = $("contador-dev");
+  const enviar = $("btn-enviar-dev");
+
+  texto.value = respuestaPrevia?.respuesta || "";
+  contador.textContent = texto.value.length;
+
+  const revisarEnvio = () => {
+    enviar.disabled = texto.value.trim().length < 3;
+  };
+
+  texto.addEventListener("input", () => {
+    contador.textContent = texto.value.length;
+    texto.parentElement.classList.toggle("limite", texto.value.length >= MAX_CARACTERES);
+    revisarEnvio();
+  });
+
+  revisarEnvio();
+  enviar.onclick = () => enviarDesarrollo();
+  texto.focus();
+}
+
+/* --- Selección múltiple --------------------------------------------------- */
+function construirMultiple(opciones, respuestaPrevia) {
+  const bloque = $("bloque-multiple");
+  bloque.classList.remove("oculto");
+
+  const cont = $("opciones-multiple");
+  opcionesElegidas = new Set(respuestaPrevia?.opciones || []);
+
+  cont.innerHTML = opciones.map((texto, idx) => `
+    <label class="opcion-multiple ${opcionesElegidas.has(texto) ? "activa" : ""}">
+      <input type="checkbox" value="${escaparParaAttr(texto)}"
+             ${opcionesElegidas.has(texto) ? "checked" : ""} />
+      <span class="marca-check-box" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      <span>${escaparHTML(texto)}</span>
+    </label>`).join("");
+
+  const enviar = $("btn-enviar-mult");
+
+  const revisarEnvio = () => {
+    enviar.disabled = opcionesElegidas.size === 0;
+  };
+
+  cont.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const val = cb.value;
+      if (cb.checked) opcionesElegidas.add(val);
+      else opcionesElegidas.delete(val);
+      cb.closest(".opcion-multiple").classList.toggle("activa", cb.checked);
+      revisarEnvio();
+    });
+  });
+
+  revisarEnvio();
+  enviar.onclick = () => enviarMultiple();
+}
+
+function escaparHTML(texto = "") {
+  const div = document.createElement("div");
+  div.textContent = texto;
+  return div.innerHTML;
+}
+function escaparParaAttr(texto = "") {
+  return texto.replace(/"/g, "&quot;");
+}
+
+/* ============================ Envíos ====================================== */
+async function enviarDebate() {
   const justificacion = $("justificacion").value.trim();
   if (!opcionElegida) { avisar("Elegí una opción."); return; }
-  if (!justificacion) { avisar("La justificación no puede quedar vacía."); return; }
+  if (!justificacion) { avisar("Escribí una justificación antes de enviar."); return; }
+  await enviar({ opcion: opcionElegida, justificacion });
+}
 
-  const boton = $("btn-enviar");
-  boton.disabled = true;
-  boton.textContent = "Enviando…";
+async function enviarDesarrollo() {
+  const respuesta = $("txt-desarrollo").value.trim();
+  if (respuesta.length < 3) { avisar("Escribí tu respuesta antes de enviar."); return; }
+  await enviar({ respuesta });
+}
+
+async function enviarMultiple() {
+  if (opcionesElegidas.size === 0) { avisar("Marcá al menos una opción."); return; }
+  await enviar({ opciones: [...opcionesElegidas] });
+}
+
+async function enviar(datos) {
+  // Deshabilitamos todos los botones de envío
+  ["btn-enviar", "btn-enviar-dev", "btn-enviar-mult"].forEach((id) => {
+    const btn = $(id);
+    if (btn) { btn.disabled = true; btn.textContent = "Enviando…"; }
+  });
+
+  const pregunta = preguntaActual();
 
   try {
     await guardarRespuesta(codigo, idParticipante, sala.indiceActual, {
       nombre,
-      afirmacion: sala.afirmaciones[sala.indiceActual],
-      opcion: opcionElegida,
-      justificacion,
+      textoPregunta: pregunta.texto,
+      tipoPregunta: pregunta.tipo,
+      ...datos,
       tiempoMs: Date.now() - cuandoAparecio
     });
     editando = false;
-    indiceRenderizado = -99;            // fuerza recomputar en el próximo render
+    indiceRenderizado = -99;
     detenerTimer();
-    // El listener de respuestas volverá a llamar a render() y mostrará "registrada".
   } catch (e) {
     avisar("No se pudo enviar. Reintentá.");
     console.error(e);
-    boton.disabled = false;
-    boton.textContent = "Enviar respuesta";
+    ["btn-enviar", "btn-enviar-dev", "btn-enviar-mult"].forEach((id) => {
+      const btn = $(id);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = btn.id === "btn-enviar" ? "Enviar respuesta" :
+                          btn.id === "btn-enviar-dev" ? "Enviar respuesta" : "Enviar selección";
+      }
+    });
   }
 }
 
-/* Pantalla de “respuesta registrada / esperando”. */
+/* Pantalla de "respuesta registrada" */
 function mostrarEstadoRespondido(puedeEditar) {
-  $("opciones").classList.add("oculto");
+  ocultarFormularios();
   $("zona-justificacion").classList.remove("visible");
   $("vista-cerrada").classList.add("oculto");
   $("vista-respondido").classList.remove("oculto");
   detenerTimer();
 
-  // Mensaje según cuánta gente respondió.
   const respondieron = new Set(respuestasActuales().map((r) => r.idParticipante)).size;
   const total = participantes.length;
-  if (total > 0 && respondieron >= total) {
-    $("txt-respondido").textContent = "Todos respondieron. Esperando que la docente muestre los resultados.";
-  } else {
-    $("txt-respondido").textContent =
-      `Esperando que finalicen los demás participantes… (${respondieron} de ${total})`;
-  }
+  $("txt-respondido").textContent =
+    total > 0 && respondieron >= total
+      ? "Todos respondieron. Esperando que la docente muestre los resultados."
+      : `Esperando que finalicen los demás participantes… (${respondieron} de ${total})`;
 
-  // Botón para modificar, solo si la docente lo habilitó.
   const btnEditar = $("btn-editar");
   btnEditar.classList.toggle("oculto", !puedeEditar);
-  btnEditar.onclick = () => {
-    editando = true;
-    indiceRenderizado = -99;
-    render();
-  };
+  btnEditar.onclick = () => { editando = true; indiceRenderizado = -99; render(); };
 }
 
 /* ============================ Vista: RESULTADOS ========================== */
@@ -324,29 +417,56 @@ function renderResultados() {
   detenerTimer();
 
   const i = sala.indiceActual;
-  $("afirmacion-res").textContent = sala.afirmaciones[i] || "";
+  const pregunta = preguntaActual();
+  $("afirmacion-res").textContent = pregunta?.texto || "";
 
   const deEsta = respuestasActuales();
-  renderBarras($("barras"), deEsta);
+  const contenedor = $("barras");
+  const bloqueJustif = $("bloque-justificaciones");
 
-  // Las justificaciones se pueden ocultar desde el panel docente.
-  const bloque = $("bloque-justificaciones");
-  if (sala.mostrarJustificaciones) {
-    bloque.classList.remove("oculto");
-    renderJustificaciones($("justificaciones"), deEsta, sala.mostrarNombres);
-  } else {
-    bloque.classList.add("oculto");
+  switch (pregunta?.tipo) {
+    case "debate":
+      contenedor.classList.remove("oculto");
+      renderBarras(contenedor, deEsta, "debate");
+      if (sala.mostrarJustificaciones) {
+        bloqueJustif.classList.remove("oculto");
+        renderJustificaciones($("justificaciones"), deEsta, sala.mostrarNombres);
+      } else {
+        bloqueJustif.classList.add("oculto");
+      }
+      break;
+
+    case "siNo":
+      contenedor.classList.remove("oculto");
+      renderBarras(contenedor, deEsta, "siNo");
+      if (sala.mostrarJustificaciones) {
+        bloqueJustif.classList.remove("oculto");
+        renderJustificaciones($("justificaciones"), deEsta, sala.mostrarNombres);
+      } else {
+        bloqueJustif.classList.add("oculto");
+      }
+      break;
+
+    case "multiple":
+      contenedor.classList.remove("oculto");
+      renderMultiple(contenedor, deEsta, pregunta.opciones || []);
+      bloqueJustif.classList.add("oculto");
+      break;
+
+    case "desarrollo":
+      contenedor.classList.add("oculto");
+      bloqueJustif.classList.remove("oculto");
+      $("bloque-justificaciones").querySelector("h2").textContent = "Respuestas";
+      renderDesarrollo($("justificaciones"), deEsta, sala.mostrarNombres);
+      break;
   }
 }
 
-/* ============================== Temporizador ============================= */
+/* ============================== Timer ==================================== */
 function iniciarTimer() {
   detenerTimer();
   const segundos = sala.segundosTemporizador;
-  if (!segundos || segundos <= 0 || !sala.inicioPreguntaMs) {
-    $("txt-cierre").textContent = "";
-    return;
-  }
+  if (!segundos || !sala.inicioPreguntaMs) { $("txt-cierre").textContent = ""; return; }
   const actualizar = () => {
     const restante = Math.max(0, segundos - Math.floor((Date.now() - sala.inicioPreguntaMs) / 1000));
     $("txt-cierre").textContent = restante > 0 ? `⏱ ${formatearTiempo(restante * 1000)}` : "⏱ tiempo cumplido";
