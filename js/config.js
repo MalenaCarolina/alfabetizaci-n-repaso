@@ -24,7 +24,6 @@ export const firebaseConfig = {
   storageBucket: "alfabetizacion-clase.firebasestorage.app",
   messagingSenderId: "88053687683",
   appId: "1:88053687683:web:d49cee28cf6d2ca1b942b6",
-  measurementId: "G-DD8ZXVHGW1"
 };
 
 
