@@ -1,26 +1,23 @@
 /* =============================================================================
- *  vistas.js  —  Render compartido de resultados
- * -----------------------------------------------------------------------------
- *  Las barras y las tarjetas de justificación se ven igual para la docente y
- *  para las estudiantes, así que el código vive acá una sola vez.
+ *  vistas.js  —  Render compartido de resultados (docente + estudiante)
  * ========================================================================== */
 
-import { OPCIONES } from "./config.js";
+import { OPCIONES_DEBATE, OPCIONES_SI_NO } from "./config.js";
 import { escaparHTML } from "./utils.js";
 
-/**
- * Dibuja el gráfico de barras animado para una afirmación.
- * @param {HTMLElement} contenedor  Dónde insertar las barras.
- * @param {Array} respuestas        Respuestas SOLO de esa afirmación.
- */
-export function renderBarras(contenedor, respuestas) {
+
+/* ===========================================================================
+ *  BARRAS ANIMADAS (para preguntas tipo "debate" y "siNo")
+ * ========================================================================== */
+export function renderBarras(contenedor, respuestas, tipo = "debate") {
+  const opciones = tipo === "siNo" ? OPCIONES_SI_NO : OPCIONES_DEBATE;
   const total = respuestas.length;
 
-  // Contamos cuántas respuestas hay por cada opción.
-  const conteo = { acuerdo: 0, depende: 0, desacuerdo: 0 };
+  const conteo = {};
+  opciones.forEach((o) => { conteo[o.clave] = 0; });
   respuestas.forEach((r) => { if (conteo[r.opcion] != null) conteo[r.opcion]++; });
 
-  contenedor.innerHTML = OPCIONES.map((op) => {
+  contenedor.innerHTML = opciones.map((op) => {
     const n = conteo[op.clave];
     const pct = total ? Math.round((n / total) * 100) : 0;
     return `
@@ -33,7 +30,6 @@ export function renderBarras(contenedor, respuestas) {
       </div>`;
   }).join("");
 
-  // Animamos el ancho en el siguiente cuadro para que se dispare la transición.
   requestAnimationFrame(() => {
     contenedor.querySelectorAll(".barra").forEach((b) => {
       b.style.width = b.dataset.pct + "%";
@@ -41,12 +37,65 @@ export function renderBarras(contenedor, respuestas) {
   });
 }
 
-/**
- * Dibuja las justificaciones como tarjetas.
- * @param {HTMLElement} contenedor
- * @param {Array} respuestas        Respuestas de esa afirmación.
- * @param {boolean} mostrarNombres  Si true, muestra el autor; si no, anónimas.
- */
+
+/* ===========================================================================
+ *  RESULTADOS DE SELECCIÓN MÚLTIPLE
+ * ========================================================================== */
+export function renderMultiple(contenedor, respuestas, opciones) {
+  // Cada respuesta tiene r.opciones = [ "texto A", "texto B", ... ]
+  const conteo = {};
+  opciones.forEach((o) => { conteo[o] = 0; });
+
+  let total = 0;
+  respuestas.forEach((r) => {
+    const elegidas = Array.isArray(r.opciones) ? r.opciones : [];
+    elegidas.forEach((o) => { if (conteo[o] != null) conteo[o]++; });
+    if (elegidas.length > 0) total++;
+  });
+
+  contenedor.innerHTML = opciones.map((texto) => {
+    const n = conteo[texto] || 0;
+    const pct = total ? Math.round((n / total) * 100) : 0;
+    return `
+      <div class="resultado" data-clave="multiple">
+        <div class="encabezado">
+          <span class="nombre-opcion">${escaparHTML(texto)}</span>
+          <span class="cifras"><b>${n}</b> · ${pct}%</span>
+        </div>
+        <div class="pista"><div class="barra" data-pct="${pct}"></div></div>
+      </div>`;
+  }).join("");
+
+  requestAnimationFrame(() => {
+    contenedor.querySelectorAll(".barra").forEach((b) => {
+      b.style.width = b.dataset.pct + "%";
+    });
+  });
+}
+
+
+/* ===========================================================================
+ *  RESPUESTAS DE DESARROLLO LIBRE (tarjetas de texto)
+ * ========================================================================== */
+export function renderDesarrollo(contenedor, respuestas, mostrarNombres) {
+  const conTexto = respuestas.filter((r) => (r.respuesta || "").trim());
+
+  if (!conTexto.length) {
+    contenedor.innerHTML = `<p class="subtitulo" style="font-size:.92rem;">Todavía no hay respuestas para mostrar.</p>`;
+    return;
+  }
+
+  contenedor.innerHTML = conTexto.map((r) => `
+    <div class="tarjeta-justificacion">
+      <div class="texto">"${escaparHTML(r.respuesta.trim())}"</div>
+      ${mostrarNombres ? `<div class="autor">— ${escaparHTML(r.nombre || "Anónimo")}</div>` : ""}
+    </div>`).join("");
+}
+
+
+/* ===========================================================================
+ *  JUSTIFICACIONES (para debate y siNo)
+ * ========================================================================== */
 export function renderJustificaciones(contenedor, respuestas, mostrarNombres) {
   const conTexto = respuestas.filter((r) => (r.justificacion || "").trim());
 
@@ -57,7 +106,8 @@ export function renderJustificaciones(contenedor, respuestas, mostrarNombres) {
 
   contenedor.innerHTML = conTexto.map((r) => `
     <div class="tarjeta-justificacion" data-clave="${r.opcion}">
-      <div class="texto">“${escaparHTML(r.justificacion.trim())}”</div>
+      <div class="texto">"${escaparHTML(r.justificacion.trim())}"</div>
       ${mostrarNombres ? `<div class="autor">— ${escaparHTML(r.nombre || "Anónimo")}</div>` : ""}
     </div>`).join("");
 }
+
