@@ -69,22 +69,46 @@
         <div class="puntos-espera" aria-hidden="true"><span></span><span></span><span></span></div>
       </section>
 
-      <!-- (3) Pregunta: afirmación + opciones + justificación -->
+      <!-- (3) Pregunta activa -->
       <section id="vista-pregunta" class="oculto">
         <p id="afirmacion" class="afirmacion" style="margin-bottom:28px;"></p>
 
-        <div class="opciones" id="opciones" role="radiogroup" aria-label="Elegí una opción"></div>
+        <!-- TIPO: debate / siNo -->
+        <div id="bloque-debate" class="oculto">
+          <div class="opciones" id="opciones" role="radiogroup" aria-label="Elegí una opción"></div>
+          <div class="zona-justificacion" id="zona-justificacion">
+            <div class="interior">
+              <label class="etiqueta" for="justificacion">Justificá brevemente tu respuesta.</label>
+              <textarea id="justificacion" class="campo" maxlength="400"
+                        placeholder="¿Por qué elegiste esa opción?"></textarea>
+              <div class="contador"><span id="contador">0</span>/<span id="max-caracteres">400</span></div>
+              <button id="btn-enviar" class="boton boton-primario boton-grande" style="margin-top:8px;" disabled>
+                Enviar respuesta
+              </button>
+            </div>
+          </div>
+        </div>
 
-        <div class="zona-justificacion" id="zona-justificacion">
-          <div class="interior">
-            <label class="etiqueta" for="justificacion">Justificá brevemente tu respuesta.</label>
-            <textarea id="justificacion" class="campo" maxlength="400"
-                      placeholder="¿Por qué elegiste esa opción?"></textarea>
-            <div class="contador"><span id="contador">0</span>/<span id="max-caracteres">400</span></div>
-            <button id="btn-enviar" class="boton boton-primario boton-grande" style="margin-top:8px;" disabled>
+        <!-- TIPO: desarrollo libre -->
+        <div id="bloque-desarrollo" class="oculto">
+          <div class="interior" style="margin-top:8px;">
+            <label class="etiqueta" for="txt-desarrollo">Escribí tu respuesta.</label>
+            <textarea id="txt-desarrollo" class="campo" maxlength="600" rows="5"
+                      placeholder="Contá tu experiencia, ideas o reflexiones…"></textarea>
+            <div class="contador"><span id="contador-dev">0</span>/<span id="max-caracteres-dev">600</span></div>
+            <button id="btn-enviar-dev" class="boton boton-primario boton-grande" style="margin-top:8px;" disabled>
               Enviar respuesta
             </button>
           </div>
+        </div>
+
+        <!-- TIPO: múltiple opción -->
+        <div id="bloque-multiple" class="oculto">
+          <p class="etiqueta" style="margin-bottom:12px;">Marcá todas las que consideres.</p>
+          <div id="opciones-multiple" class="opciones-multiple"></div>
+          <button id="btn-enviar-mult" class="boton boton-primario boton-grande" style="margin-top:20px;" disabled>
+            Enviar selección
+          </button>
         </div>
 
         <!-- Estado tras responder -->
